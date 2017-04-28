@@ -40,14 +40,22 @@ OPTS = [
 ]
 
 
-def _gen_net_id():
-    """Dell Force-10 switches can't handle network names beginning with a letter."""
-    while True:
-        net_id = str(uuid.uuid4())
+class ErrorQueueingThread(threading.Thread):
+    """Thread subclass which pushes a raised exception onto a queue."""
+
+    def __init__(self, target=None, eq=None, *args, **kwargs):
+        def new_target(*t_args, **t_kwargs):
+            with self.exceptions_queued(eq):
+                return target(*t_args, **t_kwargs)
+        super(ErrorQueueingThread, self).__init__(*args, target=new_target, **kwargs)
+
+    @contextlib.contextmanager
+    def exceptions_queued(self, eq):
         try:
-            int(net_id[0])
-        except ValueError:
-            return net_id
+            yield
+        except Exception as e:
+            eq.put(sys.exc_info())
+            raise
 
 
 def _log_excs_and_reraise(eq):
@@ -67,6 +75,16 @@ def _run_threads(ts):
         t.join()
 
 
+def _gen_net_id():
+    """Dell Force-10 switches can't handle network names beginning with a letter."""
+    while True:
+        net_id = str(uuid.uuid4())
+        try:
+            int(net_id[0])
+        except ValueError:
+            return net_id
+
+
 def _create_net(switch, vlan, net_id):
     LOG.info("Creating VLAN %d" % vlan)
     switch.add_network(vlan, net_id)
@@ -81,24 +99,6 @@ def _create_delete_net(switch, vlan, net_id):
     """Create and delete a VLAN."""
     _create_net(switch, vlan, net_id)
     _delete_net(switch, vlan)
-
-
-class ErrorQueueingThread(threading.Thread):
-    """Thread subclass which pushes a raised exception onto a queue."""
-
-    def __init__(self, target=None, eq=None, *args, **kwargs):
-        def new_target(*t_args, **t_kwargs):
-            with self.exceptions_queued(eq):
-                return target(*t_args, **t_kwargs)
-        super(ErrorQueueingThread, self).__init__(*args, target=new_target, **kwargs)
-
-    @contextlib.contextmanager
-    def exceptions_queued(self, eq):
-        try:
-            yield
-        except Exception as e:
-            eq.put(sys.exc_info())
-            raise
 
 
 def _create_delete_nets(switch, vlans):
