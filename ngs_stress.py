@@ -13,6 +13,7 @@
 # under the License.
 
 import contextlib
+import inspect
 import Queue
 import sys
 import threading
@@ -90,15 +91,19 @@ def _create_net(switch, vlan, net_id):
     switch.add_network(vlan, net_id)
 
 
-def _delete_net(switch, vlan):
+def _delete_net(switch, vlan, net_id):
     LOG.info("Deleting VLAN %d" % vlan)
-    switch.del_network(vlan)
+    # The del_network method had the network_id added as an argument.
+    if 'network_id' in inspect.getargspec(switch.del_network).args:
+        switch.del_network(vlan, net_id)
+    else:
+        switch.del_network(vlan)
 
 
 def _create_delete_net(switch, vlan, net_id):
     """Create and delete a VLAN."""
     _create_net(switch, vlan, net_id)
-    _delete_net(switch, vlan)
+    _delete_net(switch, vlan, net_id)
 
 
 def _create_delete_nets(switch, vlans):
@@ -125,13 +130,14 @@ def _add_remove_ports(switch, ports, vlan):
     """Add and remove ports to/from a VLAN in parallel."""
     ts = []
     eq = Queue.Queue()
-    _create_net(switch, vlan, _gen_net_id())
+    net_id = _gen_net_id()
+    _create_net(switch, vlan, net_id)
     for port_id in ports:
         args = (switch, port_id, vlan)
         t = ErrorQueueingThread(target=_add_remove_port, args=args, name='port-%s' % port_id, eq=eq)
         ts.append(t)
     _run_threads(ts)
-    _delete_net(switch, vlan)
+    _delete_net(switch, vlan, net_id)
     _log_excs_and_reraise(eq)
 
 
