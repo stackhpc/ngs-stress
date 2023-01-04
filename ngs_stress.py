@@ -38,6 +38,10 @@ OPTS = [
     cfg.StrOpt('vlan-range', required=True,
                help='Colon-separated range of vlan IDs to create in network '
                     'mode. In port mode the first will be used'),
+    cfg.BoolOpt('create-net', default=True,
+                help='Whether to create and delete a network in port mode'),
+    cfg.StrOpt('net-id', required=False,
+               help='Network UUID when create-net is false in port mode'),
 ]
 
 
@@ -130,14 +134,18 @@ def _add_remove_ports(switch, ports, vlan):
     """Add and remove ports to/from a VLAN in parallel."""
     ts = []
     eq = queue.Queue()
-    net_id = _gen_net_id()
-    _create_net(switch, vlan, net_id)
+    if CONF.create_net:
+        net_id = _gen_net_id()
+        _create_net(switch, vlan, net_id)
+    else:
+        net_id = CONF.net_id
     for port_id in ports:
         args = (switch, port_id, vlan)
         t = ErrorQueueingThread(target=_add_remove_port, args=args, name='port-%s' % port_id, eq=eq)
         ts.append(t)
     _run_threads(ts)
-    _delete_net(switch, vlan, net_id)
+    if CONF.create_net:
+        _delete_net(switch, vlan, net_id)
     _log_excs_and_reraise(eq)
 
 
