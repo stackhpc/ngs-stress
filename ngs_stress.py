@@ -154,6 +154,7 @@ def _init():
     CONF.register_cli_opts(OPTS)
     CONF(sys.argv[1:])
     logging.setup(CONF, 'ngs_stress')
+    LOG.info("Starting NGS stress test")
 
 
 def main():
@@ -168,6 +169,7 @@ def main():
         vlan = vlans[0]
         ports = CONF.ports.split(',')
         _add_remove_ports(switch, ports, vlan)
+    LOG.info("NGS stress test complete")
 
 
 if __name__ == "__main__":
