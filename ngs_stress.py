@@ -18,6 +18,9 @@ import queue
 import sys
 import threading
 
+import eventlet
+eventlet.monkey_patch()
+
 import networking_generic_switch.generic_switch_mech as generic_switch
 from oslo_config import cfg
 import oslo_log.log as logging
