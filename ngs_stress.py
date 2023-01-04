@@ -14,7 +14,7 @@
 
 import contextlib
 import inspect
-import Queue
+import queue
 import sys
 import threading
 
@@ -65,7 +65,7 @@ def _log_excs_and_reraise(eq):
         e = eq.get()
         LOG.error("Exception seen during test", exc_info=e)
         if eq.empty():
-            raise e
+            raise e[0]
 
 
 def _run_threads(ts):
@@ -109,7 +109,7 @@ def _create_delete_net(switch, vlan, net_id):
 def _create_delete_nets(switch, vlans):
     """Create and delete VLANs in parallel."""
     ts = []
-    eq = Queue.Queue()
+    eq = queue.Queue()
     for vlan in vlans:
         args = (switch, vlan, _gen_net_id())
         t = ErrorQueueingThread(target=_create_delete_net, args=args, name='vlan-%d' % vlan, eq=eq)
@@ -129,7 +129,7 @@ def _add_remove_port(switch, port_id, vlan):
 def _add_remove_ports(switch, ports, vlan):
     """Add and remove ports to/from a VLAN in parallel."""
     ts = []
-    eq = Queue.Queue()
+    eq = queue.Queue()
     net_id = _gen_net_id()
     _create_net(switch, vlan, net_id)
     for port_id in ports:
