@@ -45,6 +45,8 @@ OPTS = [
                 help='Whether to create and delete a network in port mode'),
     cfg.StrOpt('net-id', required=False,
                help='Network UUID when create-net is false in port mode'),
+    cfg.IntOpt('iterations', default=1,
+               help='Number of test iterations'),
 ]
 
 
@@ -66,12 +68,12 @@ class ErrorQueueingThread(threading.Thread):
             raise
 
 
-def _log_excs_and_reraise(eq):
+def _log_excs_and_reraise(eq, reraise=True):
     """Log all exceptions in a Queue and reraise one."""
     while not eq.empty():
         e = eq.get()
         LOG.error("Exception seen during test", exc_info=e)
-        if eq.empty():
+        if reraise and eq.empty():
             raise e[0]
 
 
@@ -149,7 +151,7 @@ def _add_remove_ports(switch, ports, vlan):
     _run_threads(ts)
     if CONF.create_net:
         _delete_net(switch, vlan, net_id)
-    _log_excs_and_reraise(eq)
+    _log_excs_and_reraise(eq, reraise=False)
 
 
 def _init():
@@ -167,11 +169,13 @@ def main():
     switch = gs.switches[CONF.switch]
     vlans = range(*map(int, CONF.vlan_range.split(':')))
     if CONF.mode == 'network':
-        _create_delete_nets(switch, vlans)
+        for _ in range(CONF.iterations):
+            _create_delete_nets(switch, vlans)
     else:
         vlan = vlans[0]
         ports = CONF.ports.split(',')
-        _add_remove_ports(switch, ports, vlan)
+        for _ in range(CONF.iterations):
+            _add_remove_ports(switch, ports, vlan)
     LOG.info("NGS stress test complete")
 
 
